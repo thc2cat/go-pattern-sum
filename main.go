@@ -12,6 +12,11 @@ import (
 // Purpose :
 // get rid of awk/sed/grep for logs calculations/extractions
 
+// History
+// v0.1 : functionnal
+// v0.2 : -p can print non numerical values
+// v0.21 : exit code when no pattern are founds
+
 func main() {
 
 	pat := flag.String("P", ", nrcpt=(?P<value>[0-9]+) ",
@@ -39,7 +44,7 @@ func readandprint(p *regexp.Regexp, tag string, P, S bool) {
 		line   []byte
 		length int
 		sum    int
-		values []int
+		values []string
 	)
 
 	s := bufio.NewScanner(os.Stdin)
@@ -55,18 +60,24 @@ func readandprint(p *regexp.Regexp, tag string, P, S bool) {
 			continue
 		}
 
-		val, err := strconv.Atoi(results["value"])
-		if err == nil {
-			values = append(values, val)
-		}
+		values = append(values, results["value"])
 	}
 
+	if len(values) < 1 {
+		fmt.Fprintf(os.Stderr, "pattern not found !\n")
+		os.Exit(1)
+	}
 	// ref https://yourbasic.org/golang/max-min-int-uint/
 	const UintSize = 32 << (^uint(0) >> 32 & 1) // 32 or 64
 	min := 1<<(UintSize-1) - 1
 	max := 0
 
-	for _, val := range values {
+	for _, valS := range values {
+		val, err := strconv.Atoi(valS)
+		if err != nil {
+			continue
+		}
+
 		if P && !S {
 			fmt.Println(val)
 		}
