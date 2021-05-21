@@ -16,6 +16,12 @@ import (
 // v0.1 : functionnal
 // v0.2 : -p can print non numerical values
 // v0.21 : exit code when no pattern are founds
+// v0.22 : added debug and examples
+
+// Examples :
+// ", nrcpt=(?P<value>[0-9]+)" will sum count values
+// "\[(?P<value>[^\]]+)\]" => match [value]
+// "<(?P<value>[^>]+)>"  => match <value>
 
 func main() {
 
@@ -25,6 +31,8 @@ func main() {
 		"tag to add after printing sum value")
 	printFlag := flag.Bool("p", false,
 		"only print values")
+	debugFlag := flag.Bool("d", false,
+		"debug")
 	statsFlag := flag.Bool("s", false,
 		"Show sum count/min/max/avg instead of only sum")
 	flag.Parse()
@@ -34,11 +42,14 @@ func main() {
 		fmt.Printf("Err %s with '%s'", err, *pat)
 		os.Exit(1)
 	}
+	if *debugFlag {
+		fmt.Printf("pattern: %s\n", r.String())
+	}
 
-	readandprint(r, *tag, *printFlag, *statsFlag)
+	readandprint(r, *tag, *printFlag, *statsFlag, *debugFlag)
 }
 
-func readandprint(p *regexp.Regexp, tag string, P, S bool) {
+func readandprint(p *regexp.Regexp, tag string, P, S, D bool) {
 
 	var (
 		line   []byte
@@ -55,7 +66,7 @@ func readandprint(p *regexp.Regexp, tag string, P, S bool) {
 		if length < 1 {
 			continue
 		}
-		results := reSubMatchMap(p, s.Text())
+		results := reSubMatchMap(p, s.Text(), D)
 		if results == nil {
 			continue
 		}
@@ -73,14 +84,16 @@ func readandprint(p *regexp.Regexp, tag string, P, S bool) {
 	max := 0
 
 	for _, valS := range values {
+
+		if P && !S {
+			fmt.Println(valS)
+		}
+
 		val, err := strconv.Atoi(valS)
 		if err != nil {
 			continue
 		}
 
-		if P && !S {
-			fmt.Println(val)
-		}
 		if max <= val {
 			max = val
 		}
@@ -100,14 +113,20 @@ func readandprint(p *regexp.Regexp, tag string, P, S bool) {
 
 }
 
-func reSubMatchMap(r *regexp.Regexp, str string) map[string]string {
+func reSubMatchMap(r *regexp.Regexp, str string, debugFlag bool) map[string]string {
 	match := r.FindStringSubmatch(str)
 	if len(match) == 0 {
 		return nil
 	}
 	subMatchMap := make(map[string]string)
+	if debugFlag {
+		fmt.Printf("subMatchMap %v\n", r.FindStringSubmatch(str))
+	}
 	for i, name := range r.SubexpNames() {
 		if i != 0 {
+			if debugFlag {
+				fmt.Printf("%v->match[%v]=%v\n", name, i, match[i])
+			}
 			subMatchMap[name] = match[i]
 		}
 	}
