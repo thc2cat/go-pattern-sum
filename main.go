@@ -17,6 +17,7 @@ import (
 // v0.2 : -p can print non numerical values
 // v0.21 : exit code when no pattern are founds
 // v0.22 : added debug and examples
+// v0.23 : added -M for printing max value
 
 // Examples :
 // ", nrcpt=(?P<value>[0-9]+)" will sum count values
@@ -35,6 +36,8 @@ func main() {
 		"debug")
 	statsFlag := flag.Bool("s", false,
 		"Show sum count/min/max/avg instead of only sum")
+	maxFlag := flag.Bool("M", false,
+		"Print line where max value is found")
 	flag.Parse()
 
 	r, err := regexp.Compile(*pat)
@@ -46,17 +49,24 @@ func main() {
 		fmt.Printf("pattern: %s\n", r.String())
 	}
 
-	readandprint(r, *tag, *printFlag, *statsFlag, *debugFlag)
+	readandprint(r, *tag, *printFlag, *statsFlag, *debugFlag, *maxFlag)
 }
 
-func readandprint(p *regexp.Regexp, tag string, P, S, D bool) {
+func readandprint(p *regexp.Regexp, tag string, P, S, D, M bool) {
 
 	var (
 		line   []byte
 		length int
 		sum    int
-		values []string
+		count  int
+		// values  []string
+		maxline string
 	)
+
+	// ref https://yourbasic.org/golang/max-min-int-uint/
+	const UintSize = 32 << (^uint(0) >> 32 & 1) // 32 or 64
+	min := 1<<(UintSize-1) - 1
+	max := 0
 
 	s := bufio.NewScanner(os.Stdin)
 
@@ -70,45 +80,44 @@ func readandprint(p *regexp.Regexp, tag string, P, S, D bool) {
 		if results == nil {
 			continue
 		}
+		count++
 
-		values = append(values, results["value"])
-	}
-
-	if len(values) < 1 {
-		fmt.Fprintf(os.Stderr, "pattern not found !\n")
-		os.Exit(1)
-	}
-	// ref https://yourbasic.org/golang/max-min-int-uint/
-	const UintSize = 32 << (^uint(0) >> 32 & 1) // 32 or 64
-	min := 1<<(UintSize-1) - 1
-	max := 0
-
-	for _, valS := range values {
+		// values = append(values, results["value"])
 
 		if P && !S {
-			fmt.Println(valS)
+			fmt.Println(results["value"])
 		}
 
-		val, err := strconv.Atoi(valS)
+		val, err := strconv.Atoi(results["value"])
 		if err != nil {
 			continue
 		}
 
-		if max <= val {
+		if max < val {
 			max = val
+			maxline = string(line[:])
 		}
-		if min >= val {
+		if min > val {
 			min = val
 		}
 		sum += val
 	}
 
-	if !S && !P {
+	if count < 1 {
+		fmt.Fprintf(os.Stderr, "pattern not found !\n")
+		os.Exit(1)
+	}
+
+	if !S && !P && !M {
 		fmt.Printf("%d\t%s\n", sum, tag)
 	}
 
 	if S && !P {
-		fmt.Printf("%d %d/%d/%d/%d\t%s\n", sum, len(values), min, max, int(sum/len(values)), tag)
+		fmt.Printf("%d %d/%d/%d/%d\t%s\n", sum, count, min, max, int(sum/count), tag)
+	}
+
+	if M && !P {
+		fmt.Printf("Max value found in line :\n%s", maxline)
 	}
 
 }
